@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OINP Calculator — Admin</title>
+
+<!-- ============================================================
+     SUPABASE CONFIG — PASTE THE SAME 2 VALUES YOU USED IN index.html
+============================================================ -->
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+  const SUPABASE_URL = "https://obliysgyuizoyxkevqxv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_PrYD3ZKduEZRfjg9V2Ckgg_8Wz07_sP";
+
+  // ---- SET YOUR OWN ADMIN PASSWORD HERE ----
+  const ADMIN_PASSWORD = "CHANGE_ME_PASSWORD";
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let allRows = [];
+
+  window.checkPw = function () {
+    const entered = document.getElementById('pw').value;
+    const pwErr = document.getElementById('pwErr');
+    if (entered === ADMIN_PASSWORD) {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('panel').style.display = 'block';
+      loadData();
+    } else {
+      pwErr.style.display = 'block';
+    }
+  };
+
+  async function loadData() {
+    document.getElementById('loading').style.display = 'block';
+    const { data, error } = await supabase
+      .from('visitors')
+      .select('first_name, email, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(error);
+      document.getElementById('loading').textContent = 'Failed to load data — check your Supabase config and table policies.';
+      return;
+    }
+    allRows = data;
+    document.getElementById('loading').style.display = 'none';
+    render();
+  }
+
+  function render() {
+    const nameFilter = document.getElementById('fName').value.toLowerCase();
+    const emailFilter = document.getElementById('fEmail').value.toLowerCase();
+    const filtered = allRows.filter(r =>
+      (r.first_name || '').toLowerCase().includes(nameFilter) &&
+      (r.email || '').toLowerCase().includes(emailFilter)
+    );
+    document.getElementById('count').textContent = filtered.length + ' result(s) of ' + allRows.length + ' total';
+    document.getElementById('rows').innerHTML = filtered.map(r => {
+      const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '—';
+      return `<tr><td>${escapeHtml(r.first_name || '')}</td><td>${escapeHtml(r.email || '—')}</td><td>${dt}</td></tr>`;
+    }).join('');
+    window._filteredRows = filtered;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  window.exportCsv = function () {
+    const rows = window._filteredRows || allRows;
+    const header = ['First Name', 'Email', 'Date/Time'];
+    const lines = [header.join(',')];
+    rows.forEach(r => {
+      const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '';
+      const line = [r.first_name || '', r.email || '', dt].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+      lines.push(line);
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'oinp-visitors.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('fName').addEventListener('input', render);
+    document.getElementById('fEmail').addEventListener('input', render);
+    document.getElementById('exportBtn').addEventListener('click', window.exportCsv);
+    document.getElementById('pw').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') window.checkPw();
+    });
+  });
+</script>
+<!-- ============================================================ -->
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+
+  :root{
+    --navy:#101c33;
+    --navy-deep:#0a1322;
+    --paper:#f6f3ec;
+    --red:#c8102e;
+    --red-deep:#93081f;
+    --gold:#c9a24b;
+    --line:rgba(16,28,51,0.14);
+    --ink:#101c33;
+    --muted:#5b6273;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:40px 24px 80px;}
+
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:clamp(24px, 4vw, 34px);
+    margin:0 0 24px;
+    border-bottom:2px solid var(--navy);
+    padding-bottom:16px;
+  }
+
+  #login{
+    max-width:340px;
+    margin:100px auto;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:30px 28px;
+    text-align:left;
+    box-shadow:0 12px 30px -14px rgba(16,28,51,0.25);
+  }
+  #login h2{font-family:'Fraunces', serif;margin:0 0 16px;font-size:20px;}
+  #login input{
+    width:100%;padding:11px 12px;margin-bottom:10px;
+    border:1.5px solid var(--line);border-radius:8px;box-sizing:border-box;
+    font-family:'Inter',sans-serif;font-size:14px;
+  }
+  #login input:focus{outline:none;border-color:var(--red);}
+  #login button{
+    width:100%;padding:12px;background:var(--red);color:#fff;border:none;
+    border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;
+  }
+  #login button:hover{background:var(--red-deep);}
+  #pwErr{color:var(--red);font-size:12px;display:none;margin:-4px 0 10px;}
+
+  .filters{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap;}
+  .filters input{
+    flex:1;min-width:150px;padding:10px 12px;
+    border:1.5px solid var(--line);border-radius:8px;
+    font-family:'Inter',sans-serif;font-size:14px;
+  }
+  .filters input:focus{outline:none;border-color:var(--red);}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+  #count{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;color:var(--muted);
+  }
+  #exportBtn{
+    padding:9px 16px;
+    background:var(--navy);color:var(--paper);border:none;
+    border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  #exportBtn:hover{background:var(--navy-deep);}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;border:1px solid var(--line);}
+  th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;}
+  th{
+    background:var(--navy);color:var(--paper);
+    font-family:'IBM Plex Mono', monospace;font-size:11px;
+    text-transform:uppercase;letter-spacing:0.06em;
+  }
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(16,28,51,0.03);}
+
+  #loading{font-family:'IBM Plex Mono', monospace;font-size:13px;color:var(--muted);margin:16px 0;}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Admin Login</h2>
+  <input id="pw" type="password" placeholder="Password">
+  <div id="pwErr">Incorrect password.</div>
+  <button onclick="checkPw()">Enter</button>
+</div>
+
+<div class="wrap" id="panel" style="display:none;">
+  <h1>Visitor Log</h1>
+
+  <div class="filters">
+    <input id="fName" placeholder="Filter by first name">
+    <input id="fEmail" placeholder="Filter by email">
+  </div>
+
+  <div class="toolbar">
+    <div id="count"></div>
+    <button id="exportBtn">Export CSV</button>
+  </div>
+
+  <div id="loading">Loading…</div>
+
+  <table>
+    <thead><tr><th>First Name</th><th>Email</th><th>Date / Time</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+</body>
+</html>
