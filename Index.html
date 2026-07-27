@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OWP EOI Score Calculator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+
+  :root{
+    --navy:#101c33;
+    --navy-deep:#0a1322;
+    --paper:#f6f3ec;
+    --red:#c8102e;
+    --red-deep:#93081f;
+    --gold:#c9a24b;
+    --line:rgba(16,28,51,0.14);
+    --ink:#101c33;
+    --muted:#5b6273;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    background-image:
+      radial-gradient(circle at 10% 0%, rgba(200,16,46,0.06), transparent 40%),
+      radial-gradient(circle at 90% 100%, rgba(16,28,51,0.06), transparent 40%);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 100px;}
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:24px;
+    border-bottom:2px solid var(--navy);
+    padding-bottom:22px;
+    margin-bottom:36px;
+    flex-wrap:wrap;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--red);
+    margin:0 0 8px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:clamp(28px, 4vw, 42px);
+    line-height:1.05;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .max-badge{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--muted);
+    text-align:right;
+    line-height:1.5;
+  }
+  .max-badge b{
+    display:block;
+    font-family:'Fraunces', serif;
+    font-size:30px;
+    color:var(--navy);
+    font-weight:700;
+  }
+
+  .score-rail{
+    position:sticky;
+    top:16px;
+    z-index:10;
+    background:var(--navy);
+    color:var(--paper);
+    border-radius:14px;
+    padding:20px 24px;
+    margin-bottom:40px;
+    box-shadow:0 12px 30px -14px rgba(16,28,51,0.55);
+    display:flex;
+    align-items:center;
+    gap:24px;
+    flex-wrap:wrap;
+  }
+  .score-rail .num{
+    font-family:'Fraunces', serif;
+    font-size:44px;
+    font-weight:700;
+    line-height:1;
+    white-space:nowrap;
+  }
+  .score-rail .num span{font-size:20px;color:rgba(246,243,236,0.55);font-weight:500;}
+  .score-rail .bar-area{flex:1;min-width:200px;}
+  .score-rail .label-row{
+    display:flex;justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:rgba(246,243,236,0.6);
+    margin-bottom:8px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+  }
+  .bar-track{
+    height:8px;background:rgba(246,243,236,0.15);border-radius:99px;overflow:hidden;
+  }
+  .bar-fill{
+    height:100%;
+    background:linear-gradient(90deg, var(--red) 0%, var(--gold) 100%);
+    border-radius:99px;
+    width:0%;
+    transition:width 0.4s cubic-bezier(.4,0,.2,1);
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+    gap:18px;
+  }
+
+  .factor{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:20px 22px 22px;
+    position:relative;
+  }
+  .factor::before{
+    content:attr(data-n);
+    position:absolute;
+    top:-11px;
+    left:18px;
+    background:var(--red);
+    color:#fff;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    font-weight:500;
+    width:22px;height:22px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .factor h3{
+    font-family:'Fraunces', serif;
+    font-size:16px;
+    font-weight:700;
+    margin:4px 0 2px;
+    line-height:1.25;
+  }
+  .factor .maxpts{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--muted);
+    margin:0 0 14px;
+  }
+  select{
+    width:100%;
+    appearance:none;
+    -webkit-appearance:none;
+    background:var(--paper);
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    padding:11px 38px 11px 12px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    font-weight:500;
+    color:var(--ink);
+    cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23101c33' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 14px center;
+    transition:border-color 0.15s;
+  }
+  select:focus{outline:none;border-color:var(--red);}
+  select:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
+
+  .pts-out{
+    margin-top:12px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--navy);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .pts-out .val{
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    font-weight:700;
+    color:var(--red);
+  }
+
+  footer{
+    margin-top:52px;
+    padding-top:20px;
+    border-top:1px solid var(--line);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    line-height:1.7;
+  }
+  footer a{color:var(--red);}
+
+  @media (prefers-reduced-motion: reduce){
+    .bar-fill{transition:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow">Ontario Workforce Priority Stream</p>
+      <h1>EOI Score<br>Calculator</h1>
+    </div>
+    <div class="max-badge">2026 scoring factors<b>130 pts max</b></div>
+  </header>
+
+  <div class="score-rail">
+    <div class="num" id="totalNum">0<span>/130</span></div>
+    <div class="bar-area">
+      <div class="label-row"><span>Your score</span><span id="pctLabel">0%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    Based on the OINP Ontario Workforce Priority Stream EOI scoring factors published July 20, 2026. This is an unofficial
+    estimate for personal planning — verify exact category definitions and eligibility against
+    <a href="https://www.ontario.ca/page/ontario-workforce-priority-stream" target="_blank" rel="noopener">ontario.ca</a>
+    before applying. &nbsp;|&nbsp; FSH
+  </footer>
+
+</div>
+
+<script>
+const factors = [
+  {
+    title: "NOC TEER Category",
+    max: 9,
+    options: [
+      ["TEER 0 or 1", 9],
+      ["TEER 2 or 3", 6],
+      ["TEER 4 or 5", 0],
+    ]
+  },
+  {
+    title: "NOC Broad Occupational Category",
+    max: 10,
+    options: [
+      ["Category 3", 10],
+      ["Category 7", 8],
+      ["Category 2", 6],
+      ["Category 0, 1, 4, 8, 9", 4],
+      ["Category 5, 6", 2],
+    ]
+  },
+  {
+    title: "Hourly Wage",
+    max: 15,
+    options: [
+      ["$40+", 15],
+      ["$35 – $39.99", 12],
+      ["$30 – $34.99", 10],
+      ["$25 – $29.99", 8],
+      ["$20 – $24.99", 5],
+      ["Under $20", 0],
+    ]
+  },
+  {
+    title: "Ontario Work Experience",
+    max: 18,
+    options: [
+      ["More than 24 months", 18],
+      ["13 – 24 months", 15],
+      ["6 – 12 months", 12],
+      ["Less than 6 months", 0],
+    ]
+  },
+  {
+    title: "Canadian Earnings History",
+    max: 8,
+    options: [
+      ["$70,000+", 8],
+      ["$50,000 – $69,999", 6],
+      ["$30,000 – $49,999", 4],
+      ["Under $30,000", 0],
+    ]
+  },
+  {
+    title: "Legal Status in Canada",
+    max: 10,
+    options: [
+      ["Valid work permit", 10],
+      ["Valid study permit", 5],
+      ["No valid permit", 0],
+    ]
+  },
+  {
+    title: "Highest Level of Education",
+    max: 10,
+    options: [
+      ["PhD / Dr / Vet", 10],
+      ["Master's", 8],
+      ["Bachelor's", 6],
+      ["ON College Grad Certificate", 5],
+      ["University Cert/Diploma (below Bachelor's)", 5],
+      ["College/CEGEP/Trade Cert or Diploma", 5],
+      ["Apprenticeship/Trade", 5],
+      ["Less than the above", 0],
+    ]
+  },
+  {
+    title: "Number of Canadian Education Credentials",
+    max: 10,
+    options: [
+      ["More than one", 10],
+      ["One", 5],
+      ["None", 0],
+    ]
+  },
+  {
+    title: "Official Language Ability (Eng or Fre)",
+    max: 15,
+    options: [
+      ["CLB 9+", 15],
+      ["CLB 8", 12],
+      ["CLB 7", 8],
+      ["CLB 6", 4],
+      ["CLB 5 or lower", 0],
+    ]
+  },
+  {
+    title: "Knowledge of Both Official Languages",
+    max: 10,
+    options: [
+      ["Two languages", 10],
+      ["One language", 5],
+    ]
+  },
+  {
+    title: "Regional Immigration: Location of Employment",
+    max: 15,
+    options: [
+      ["Northern Ontario", 15],
+      ["Eastern/Central outside GTA / Southwestern", 10],
+      ["Inside GTA except Toronto", 5],
+      ["Toronto", 0],
+    ]
+  },
+];
+
+const grid = document.getElementById('grid');
+const totalNum = document.getElementById('totalNum');
+const barFill = document.getElementById('barFill');
+const pctLabel = document.getElementById('pctLabel');
+const MAX_TOTAL = factors.reduce((s,f)=>s+f.max,0);
+
+factors.forEach((f, i) => {
+  const card = document.createElement('div');
+  card.className = 'factor';
+  card.dataset.n = i+1;
+
+  const h3 = document.createElement('h3');
+  h3.textContent = f.title;
+  card.appendChild(h3);
+
+  const maxp = document.createElement('p');
+  maxp.className = 'maxpts';
+  maxp.textContent = `Max ${f.max} points`;
+  card.appendChild(maxp);
+
+  const select = document.createElement('select');
+  select.dataset.max = f.max;
+  const placeholder = document.createElement('option');
+  placeholder.textContent = 'Select…';
+  placeholder.value = '';
+  placeholder.selected = true;
+  placeholder.disabled = true;
+  select.appendChild(placeholder);
+
+  f.options.forEach(([label, pts]) => {
+    const opt = document.createElement('option');
+    opt.textContent = label;
+    opt.value = pts;
+    select.appendChild(opt);
+  });
+
+  const out = document.createElement('div');
+  out.className = 'pts-out';
+  out.innerHTML = `<span>Points</span><span class="val">0</span>`;
+
+  select.addEventListener('change', () => {
+    out.querySelector('.val').textContent = select.value === '' ? '0' : select.value;
+    updateTotal();
+  });
+
+  card.appendChild(select);
+  card.appendChild(out);
+  grid.appendChild(card);
+});
+
+function updateTotal(){
+  const selects = grid.querySelectorAll('select');
+  let total = 0;
+  selects.forEach(s => { total += s.value === '' ? 0 : parseInt(s.value, 10); });
+  totalNum.innerHTML = `${total}<span>/${MAX_TOTAL}</span>`;
+  const pct = Math.round((total/MAX_TOTAL)*100);
+  barFill.style.width = pct + '%';
+  pctLabel.textContent = pct + '%';
+}
+</script>
+</body>
+</html>
