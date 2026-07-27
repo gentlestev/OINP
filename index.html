@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OWP EOI Score Calculator</title>
+
+<!-- ============================================================
+     SUPABASE CONFIG — REPLACE THE 2 VALUES BELOW BEFORE UPLOADING
+     Get these from: Supabase Project → Settings → API
+============================================================ -->
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+  const SUPABASE_URL = "https://obliysgyuizoyxkevqxv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_PrYD3ZKduEZRfjg9V2Ckgg_8Wz07_sP";
+
+  window._supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+<!-- ============================================================ -->
+
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
 
@@ -209,9 +224,66 @@
   @media (prefers-reduced-motion: reduce){
     .bar-fill{transition:none;}
   }
+
+  /* ---------- Visitor gate styles ---------- */
+  #gateOverlay{
+    position:fixed;inset:0;
+    background:var(--navy-deep);
+    display:flex;align-items:center;justify-content:center;
+    z-index:9999;padding:20px;
+  }
+  #gateForm{
+    background:#fff;
+    padding:30px 28px;
+    border-radius:14px;
+    max-width:360px;
+    width:100%;
+    box-shadow:0 20px 50px rgba(0,0,0,.4);
+    font-family:'Inter',sans-serif;
+  }
+  #gateForm h2{
+    font-family:'Fraunces', serif;
+    margin:0 0 6px;
+    font-size:22px;
+    color:var(--navy);
+  }
+  #gateForm p{margin:0 0 18px;color:var(--muted);font-size:14px;line-height:1.5;}
+  #gateForm label{display:block;font-size:13px;margin-bottom:5px;color:var(--ink);font-weight:500;}
+  #gateForm input{
+    width:100%;padding:11px 12px;margin-bottom:14px;
+    border:1.5px solid var(--line);border-radius:8px;
+    box-sizing:border-box;font-family:'Inter',sans-serif;font-size:14px;
+  }
+  #gateForm input:focus{outline:none;border-color:var(--red);}
+  #gateForm button{
+    width:100%;padding:13px;
+    background:var(--red);color:#fff;border:none;border-radius:8px;
+    font-size:15px;font-weight:600;cursor:pointer;
+    font-family:'Inter',sans-serif;
+    transition:background 0.15s;
+  }
+  #gateForm button:hover{background:var(--red-deep);}
+  #gateForm .err{color:var(--red);font-size:12px;margin:-8px 0 12px;display:none;}
 </style>
 </head>
 <body>
+
+<!-- ============ VISITOR GATE ============ -->
+<div id="gateOverlay">
+  <form id="gateForm">
+    <h2>Welcome</h2>
+    <p>Enter your name to access the EOI Score Calculator.</p>
+    <label for="gateName">First name *</label>
+    <input id="gateName" required maxlength="80" autocomplete="given-name">
+    <label for="gateEmail">Email (optional)</label>
+    <input id="gateEmail" type="email" maxlength="120" autocomplete="email">
+    <div class="err" id="gateErr">Please enter your first name.</div>
+    <button type="submit">Continue</button>
+  </form>
+</div>
+
+<!-- ============ CALCULATOR (hidden until gate is passed) ============ -->
+<div id="calculatorContent" style="display:none;">
 <div class="wrap">
 
   <header>
@@ -240,6 +312,39 @@
   </footer>
 
 </div>
+</div>
+
+<script>
+  // ---------- Gate submit handler ----------
+  document.getElementById('gateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const firstName = document.getElementById('gateName').value.trim();
+    const email = document.getElementById('gateEmail').value.trim();
+    const errEl = document.getElementById('gateErr');
+
+    if (!firstName) {
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+
+    try {
+      if (window._supabase) {
+        await window._supabase.from('visitors').insert({
+          first_name: firstName,
+          email: email || null,
+          user_agent: navigator.userAgent
+        });
+      }
+    } catch (err) {
+      console.error('Tracking failed:', err);
+      // Don't block access to the calculator if tracking fails
+    }
+
+    document.getElementById('gateOverlay').style.display = 'none';
+    document.getElementById('calculatorContent').style.display = 'block';
+  });
+</script>
 
 <script>
 const factors = [
