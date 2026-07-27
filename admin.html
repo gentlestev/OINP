@@ -44,7 +44,7 @@
     document.getElementById('loading').style.display = 'block';
     const { data, error } = await supabase
       .from('visitors')
-      .select('first_name, email, created_at')
+      .select('first_name, email, score, max_score, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -80,14 +80,20 @@
     document.getElementById('statMonth').textContent = thisMonth;
     document.getElementById('statEmail').textContent = withEmail + ' (' + emailRate + '%)';
 
+    const scored = allRows.filter(r => r.score !== null && r.score !== undefined);
+    const avgScore = scored.length ? Math.round(scored.reduce((s, r) => s + r.score, 0) / scored.length) : 0;
+    const avgMax = scored.length ? scored[0].max_score || 130 : 130;
+    document.getElementById('statAvgScore').textContent = scored.length ? (avgScore + '/' + avgMax) : '—';
+
     // Recent activity feed — last 8
     const recent = allRows.slice(0, 8);
     document.getElementById('recentFeed').innerHTML = recent.map(r => {
       const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '—';
+      const scoreTxt = (r.score !== null && r.score !== undefined) ? ' <span class="feed-email">· scored ' + r.score + '/' + (r.max_score || 130) + '</span>' : '';
       return `<div class="feed-item">
                 <div class="feed-dot"></div>
                 <div>
-                  <div class="feed-name">${escapeHtml(r.first_name || 'Unknown')}${r.email ? ' <span class="feed-email">· ' + escapeHtml(r.email) + '</span>' : ''}</div>
+                  <div class="feed-name">${escapeHtml(r.first_name || 'Unknown')}${r.email ? ' <span class="feed-email">· ' + escapeHtml(r.email) + '</span>' : ''}${scoreTxt}</div>
                   <div class="feed-time">${dt}</div>
                 </div>
               </div>`;
@@ -119,7 +125,8 @@
     document.getElementById('count').textContent = filtered.length + ' result(s) of ' + allRows.length + ' total';
     document.getElementById('rows').innerHTML = filtered.map(r => {
       const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '—';
-      return `<tr><td>${escapeHtml(r.first_name || '')}</td><td>${escapeHtml(r.email || '—')}</td><td>${dt}</td></tr>`;
+      const scoreTxt = (r.score !== null && r.score !== undefined) ? r.score + ' / ' + (r.max_score || 130) : '—';
+      return `<tr><td>${escapeHtml(r.first_name || '')}</td><td>${escapeHtml(r.email || '—')}</td><td>${scoreTxt}</td><td>${dt}</td></tr>`;
     }).join('');
     window._filteredRows = filtered;
   }
@@ -130,11 +137,12 @@
 
   window.exportCsv = function () {
     const rows = window._filteredRows || allRows;
-    const header = ['First Name', 'Email', 'Date/Time'];
+    const header = ['First Name', 'Email', 'Score', 'Date/Time'];
     const lines = [header.join(',')];
     rows.forEach(r => {
       const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '';
-      const line = [r.first_name || '', r.email || '', dt].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+      const scoreTxt = (r.score !== null && r.score !== undefined) ? (r.score + '/' + (r.max_score || 130)) : '';
+      const line = [r.first_name || '', r.email || '', scoreTxt, dt].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
       lines.push(line);
     });
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -357,6 +365,7 @@
         <div class="stat-card"><div class="num" id="statWeek">0</div><div class="lbl">Last 7 Days</div></div>
         <div class="stat-card"><div class="num" id="statMonth">0</div><div class="lbl">Last 30 Days</div></div>
         <div class="stat-card"><div class="num" id="statEmail">0</div><div class="lbl">Left Email</div></div>
+        <div class="stat-card"><div class="num" id="statAvgScore">—</div><div class="lbl">Avg. Score</div></div>
       </div>
 
       <div class="chart-box">
@@ -385,7 +394,7 @@
         </div>
       </div>
       <table>
-        <thead><tr><th>First Name</th><th>Email</th><th>Date / Time</th></tr></thead>
+        <thead><tr><th>First Name</th><th>Email</th><th>Score</th><th>Date / Time</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
