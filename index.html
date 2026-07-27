@@ -330,11 +330,14 @@
 
     try {
       if (window._supabase) {
-        await window._supabase.from('visitors').insert({
+        const { data, error } = await window._supabase.from('visitors').insert({
           first_name: firstName,
           email: email || null,
           user_agent: navigator.userAgent
-        });
+        }).select().single();
+        if (!error && data) {
+          window._visitorId = data.id;
+        }
       }
     } catch (err) {
       console.error('Tracking failed:', err);
@@ -521,6 +524,22 @@ function updateTotal(){
   const pct = Math.round((total/MAX_TOTAL)*100);
   barFill.style.width = pct + '%';
   pctLabel.textContent = pct + '%';
+  saveScore(total);
+}
+
+let _scoreSaveTimer = null;
+function saveScore(total){
+  if (!window._supabase || !window._visitorId) return;
+  clearTimeout(_scoreSaveTimer);
+  _scoreSaveTimer = setTimeout(async () => {
+    try {
+      await window._supabase.from('visitors')
+        .update({ score: total, max_score: MAX_TOTAL })
+        .eq('id', window._visitorId);
+    } catch (err) {
+      console.error('Score save failed:', err);
+    }
+  }, 500);
 }
 </script>
 </body>
