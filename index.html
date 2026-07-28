@@ -225,6 +225,76 @@
     .bar-fill{transition:none;}
   }
 
+  /* ---------- Rate button ---------- */
+  .rate-area{margin-top:32px;text-align:center;}
+  #rateBtn{
+    padding:15px 36px;
+    background:var(--navy);color:#fff;border:none;border-radius:10px;
+    font-family:'Inter',sans-serif;font-size:15.5px;font-weight:600;
+    cursor:pointer;transition:background 0.15s, transform 0.1s;
+    box-shadow:0 10px 24px -12px rgba(16,28,51,0.5);
+  }
+  #rateBtn:hover{background:var(--navy-deep);}
+  #rateBtn:active{transform:scale(0.98);}
+  .rate-err{color:var(--red);font-size:12.5px;margin-top:10px;display:none;font-family:'Inter',sans-serif;}
+
+  /* ---------- Rating modal ---------- */
+  #ratingOverlay{
+    position:fixed;inset:0;
+    background:rgba(10,19,34,0.72);
+    display:none;align-items:center;justify-content:center;
+    z-index:9999;padding:20px;
+  }
+  #ratingModal{
+    background:#fff;
+    max-width:440px;width:100%;
+    border-radius:16px;
+    padding:34px 30px 28px;
+    box-shadow:0 24px 60px rgba(0,0,0,.45);
+    font-family:'Inter',sans-serif;
+    text-align:center;
+    position:relative;
+  }
+  #ratingModal .rm-score{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:46px;
+    color:var(--navy);
+    margin:0 0 4px;
+  }
+  #ratingModal .rm-score span{font-size:20px;color:var(--muted);font-weight:500;}
+  #ratingModal .rm-headline{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:20px;
+    color:var(--red);
+    margin:10px 0 14px;
+    line-height:1.3;
+  }
+  #ratingModal .rm-body{
+    font-size:14.5px;
+    line-height:1.6;
+    color:var(--ink);
+    margin:0 0 18px;
+  }
+  #ratingModal .rm-note{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    line-height:1.6;
+    background:var(--paper);
+    border-radius:10px;
+    padding:14px 16px;
+    text-align:left;
+    margin:0 0 20px;
+  }
+  #ratingModal button{
+    padding:12px 30px;
+    background:var(--navy);color:#fff;border:none;border-radius:8px;
+    font-family:'Inter',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;
+  }
+  #ratingModal button:hover{background:var(--navy-deep);}
+
   /* ---------- Visitor gate styles ---------- */
   #gateOverlay{
     position:fixed;inset:0;
@@ -304,6 +374,11 @@
 
   <div class="grid" id="grid"></div>
 
+  <div class="rate-area">
+    <button id="rateBtn" type="button">See My Rating</button>
+    <div class="rate-err" id="rateErr">Please answer all 11 factors first.</div>
+  </div>
+
   <footer>
     Based on the OINP Ontario Workforce Priority Stream EOI scoring factors published July 20, 2026. This is an unofficial
     estimate for personal planning — verify exact category definitions and eligibility against
@@ -312,6 +387,17 @@
   </footer>
 
 </div>
+</div>
+
+<!-- ============ RATING MODAL ============ -->
+<div id="ratingOverlay">
+  <div id="ratingModal">
+    <div class="rm-score" id="rmScore">0<span>/130</span></div>
+    <div class="rm-headline" id="rmHeadline"></div>
+    <p class="rm-body" id="rmBody"></p>
+    <div class="rm-note">Good score — but no guarantees. The OINP Workforce Priority Stream hasn't started issuing invitations yet, so no one knows what score will actually get invited. Treat this as planning info, not a promise.</div>
+    <button type="button" onclick="document.getElementById('ratingOverlay').style.display='none'">Got it</button>
+  </div>
 </div>
 
 <script>
@@ -327,6 +413,7 @@
       return;
     }
     errEl.style.display = 'none';
+    window._firstName = firstName;
 
     try {
       if (window._supabase) {
@@ -541,6 +628,61 @@ function saveScore(total){
     }
   }, 500);
 }
+
+// ---------- Rating messages ----------
+const RATING_TIERS = [
+  { min: 0.885, headline: () => "Outstanding position.", body: (n,s,m) => `${n}, a ${s}/${m} is about as strong as this stream gets. On paper, you're doing everything right — occupation, wage, experience and language are all pulling their weight for you.` },
+  { min: 0.885, headline: () => "Top-tier score.", body: (n,s,m) => `${n}, ${s}/${m} puts you right near the ceiling of this scoring model. Very few people land this high across all 11 factors at once — that's a genuinely strong file.` },
+  { min: 0.77, headline: () => "Excellent score.", body: (n,s,m) => `${n}, ${s}/${m} is a really solid number — well above the midpoint, with clear strength across most factors. You've built a competitive profile.` },
+  { min: 0.77, headline: () => "Strong showing.", body: (n,s,m) => `Nice work, ${n}. ${s}/${m} reflects a genuinely well-rounded profile — you're not relying on just one or two factors, several are pulling weight together.` },
+  { min: 0.62, headline: () => "Solid, competitive score.", body: (n,s,m) => `${n}, ${s}/${m} is a healthy score with real strengths to build on. A factor or two of improvement — wage, experience, or language — could push you even higher.` },
+  { min: 0.62, headline: () => "Good foundation.", body: (n,s,m) => `${s}/${m} is a good base, ${n}. You've clearly got some strong factors working for you already — worth looking at which ones are still at zero for easy gains.` },
+  { min: 0.45, headline: () => "Fair score, real room to grow.", body: (n,s,m) => `${n}, ${s}/${m} gives you something to work with. A few factors — language level, Ontario experience, or wage bracket — are common places people pick up meaningful points.` },
+  { min: 0.45, headline: () => "You're on the board.", body: (n,s,m) => `${s}/${m} isn't your ceiling, ${n} — it's a starting point. Revisit the factors scoring 0 first; those are usually the fastest wins.` },
+  { min: 0, headline: () => "Early stage — that's OK.", body: (n,s,m) => `${n}, ${s}/${m} just means there's a clear path forward. Focus on language ability and Ontario work experience first — those carry some of the biggest point swings in this model.` },
+  { min: 0, headline: () => "Room to build.", body: (n,s,m) => `Everyone starts somewhere, ${n}. ${s}/${m} today doesn't reflect where you could be in six months — language gains and more Ontario experience move this number a lot.` },
+];
+
+function showRating(firstName, total, max){
+  const pct = total / max;
+  const pool = RATING_TIERS.filter(t => pct >= t.min);
+  const floor = pool.length ? Math.max(...pool.map(t => t.min)) : 0;
+  const tierOptions = RATING_TIERS.filter(t => t.min === floor);
+  const chosen = tierOptions[Math.floor(Math.random() * tierOptions.length)];
+  const name = firstName || 'there';
+
+  document.getElementById('rmScore').innerHTML = `${total}<span>/${max}</span>`;
+  document.getElementById('rmHeadline').textContent = chosen.headline();
+  document.getElementById('rmBody').textContent = chosen.body(name, total, max);
+  document.getElementById('ratingOverlay').style.display = 'flex';
+}
+
+document.getElementById('rateBtn').addEventListener('click', async () => {
+  const selects = grid.querySelectorAll('select');
+  const allAnswered = Array.from(selects).every(s => s.value !== '');
+  const errEl = document.getElementById('rateErr');
+
+  if (!allAnswered) {
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  let total = 0;
+  selects.forEach(s => { total += parseInt(s.value, 10); });
+
+  if (window._supabase && window._visitorId) {
+    try {
+      await window._supabase.from('visitors')
+        .update({ score: total, max_score: MAX_TOTAL })
+        .eq('id', window._visitorId);
+    } catch (err) {
+      console.error('Score save failed:', err);
+    }
+  }
+
+  showRating(window._firstName, total, MAX_TOTAL);
+});
 </script>
 </body>
 </html>
