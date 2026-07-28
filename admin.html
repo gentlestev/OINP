@@ -56,6 +56,23 @@
     document.getElementById('loading').style.display = 'none';
     renderOverview();
     renderTable();
+    renderRanking();
+    renderEmails();
+  }
+
+  // Collapse repeat submissions from the same person down to their latest
+  // row only. Matched by email when present, otherwise by first name.
+  function dedupeLatest(rows) {
+    const map = new Map();
+    rows.forEach(r => {
+      const key = (r.email && r.email.trim().toLowerCase())
+        || ('name:' + (r.first_name || '').trim().toLowerCase());
+      const existing = map.get(key);
+      if (!existing || new Date(r.created_at) > new Date(existing.created_at)) {
+        map.set(key, r);
+      }
+    });
+    return Array.from(map.values());
   }
 
   function isSameDay(d1, d2) {
@@ -131,6 +148,48 @@
     window._filteredRows = filtered;
   }
 
+  function renderRanking() {
+    const scoredLatest = dedupeLatest(allRows.filter(r => r.score !== null && r.score !== undefined));
+    const ranked = scoredLatest.sort((a, b) => (b.score - a.score) || (new Date(a.created_at) - new Date(b.created_at)));
+
+    document.getElementById('rankCount').textContent = ranked.length + ' ranked (latest score per person)';
+    document.getElementById('rankRows').innerHTML = ranked.map((r, i) => {
+      const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '—';
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      return `<tr><td>${medal}</td><td>${escapeHtml(r.first_name || 'Unknown')}</td><td>${escapeHtml(r.email || '—')}</td><td><b>${r.score}</b> / ${r.max_score || 130}</td><td>${dt}</td></tr>`;
+    }).join('') || '<tr><td colspan="5" style="color:var(--muted);">No scores yet.</td></tr>';
+  }
+
+  function renderEmails() {
+    const withEmail = dedupeLatest(allRows.filter(r => r.email));
+    const sorted = withEmail.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    document.getElementById('emailCount').textContent = sorted.length + ' unique email(s)';
+    document.getElementById('emailRows').innerHTML = sorted.map(r => {
+      const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '—';
+      const scoreTxt = (r.score !== null && r.score !== undefined) ? r.score + ' / ' + (r.max_score || 130) : '—';
+      return `<tr><td>${escapeHtml(r.first_name || 'Unknown')}</td><td>${escapeHtml(r.email)}</td><td>${scoreTxt}</td><td>${dt}</td></tr>`;
+    }).join('') || '<tr><td colspan="4" style="color:var(--muted);">No emails collected yet.</td></tr>';
+  }
+
+  window.exportEmailsCsv = function () {
+    const withEmail = dedupeLatest(allRows.filter(r => r.email)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const header = ['First Name', 'Email', 'Score', 'Date/Time'];
+    const lines = [header.join(',')];
+    withEmail.forEach(r => {
+      const dt = r.created_at ? new Date(r.created_at).toLocaleString() : '';
+      const scoreTxt = (r.score !== null && r.score !== undefined) ? (r.score + '/' + (r.max_score || 130)) : '';
+      lines.push([r.first_name || '', r.email, scoreTxt, dt].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'oinp-emails.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -159,6 +218,7 @@
     document.getElementById('fEmail').addEventListener('input', renderTable);
     document.getElementById('exportBtn').addEventListener('click', window.exportCsv);
     document.getElementById('refreshBtn').addEventListener('click', loadData);
+    document.getElementById('exportEmailBtn').addEventListener('click', window.exportEmailsCsv);
     document.getElementById('pw').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') window.checkPw();
     });
@@ -351,6 +411,8 @@
     <p class="brand">OINP Admin</p>
     <div class="nav-item active" id="nav-overview" onclick="showTab('overview')">Overview</div>
     <div class="nav-item" id="nav-visitors" onclick="showTab('visitors')">Visitor Log</div>
+    <div class="nav-item" id="nav-ranking" onclick="showTab('ranking')">Ranking</div>
+    <div class="nav-item" id="nav-emails" onclick="showTab('emails')">Email List</div>
   </nav>
 
   <main>
@@ -396,6 +458,33 @@
       <table>
         <thead><tr><th>First Name</th><th>Email</th><th>Score</th><th>Date / Time</th></tr></thead>
         <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <!-- ===== RANKING TAB ===== -->
+    <div class="tab-panel" id="tab-ranking" style="display:none;">
+      <h1>Ranking</h1>
+      <div class="toolbar">
+        <div id="rankCount"></div>
+      </div>
+      <table>
+        <thead><tr><th>Rank</th><th>First Name</th><th>Email</th><th>Score</th><th>Date / Time</th></tr></thead>
+        <tbody id="rankRows"></tbody>
+      </table>
+    </div>
+
+    <!-- ===== EMAIL LIST TAB ===== -->
+    <div class="tab-panel" id="tab-emails" style="display:none;">
+      <h1>Email List</h1>
+      <div class="toolbar">
+        <div id="emailCount"></div>
+        <div>
+          <button id="exportEmailBtn">Export CSV</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>First Name</th><th>Email</th><th>Score</th><th>Date / Time</th></tr></thead>
+        <tbody id="emailRows"></tbody>
       </table>
     </div>
   </main>
