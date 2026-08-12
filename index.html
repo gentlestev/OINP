@@ -8,6 +8,10 @@
 <!-- ============================================================
      SUPABASE CONFIG — REPLACE THE 2 VALUES BELOW BEFORE UPLOADING
      Get these from: Supabase Project → Settings → API
+
+     REQUIRED ONE-TIME SETUP: run this in the Supabase SQL editor
+     before this page will save/read NOC-category averages:
+       ALTER TABLE visitors ADD COLUMN IF NOT EXISTS teer_category text;
 ============================================================ -->
 <script type="module">
   import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -29,6 +33,7 @@
     --red:#c8102e;
     --red-deep:#93081f;
     --gold:#c9a24b;
+    --green:#1a7f37;
     --line:rgba(16,28,51,0.14);
     --ink:#101c33;
     --muted:#5b6273;
@@ -238,62 +243,123 @@
   #rateBtn:active{transform:scale(0.98);}
   .rate-err{color:var(--red);font-size:12.5px;margin-top:10px;display:none;font-family:'Inter',sans-serif;}
 
-  /* ---------- Rating modal ---------- */
-  #ratingOverlay{
-    position:fixed;inset:0;
-    background:rgba(10,19,34,0.72);
-    display:none;align-items:center;justify-content:center;
-    z-index:9999;padding:20px;
-  }
-  #ratingModal{
-    background:#fff;
-    max-width:440px;width:100%;
-    border-radius:16px;
-    padding:34px 30px 28px;
-    box-shadow:0 24px 60px rgba(0,0,0,.45);
-    font-family:'Inter',sans-serif;
-    text-align:center;
-    position:relative;
-  }
-  #ratingModal .rm-score{
+  /* ---------- Results page (replaces calculator after scoring) ---------- */
+  #resultsPage{display:none;}
+  .results-score{
     font-family:'Fraunces', serif;
     font-weight:700;
-    font-size:46px;
+    font-size:52px;
     color:var(--navy);
-    margin:0 0 4px;
+    text-align:center;
+    margin:10px 0 0;
   }
-  #ratingModal .rm-score span{font-size:20px;color:var(--muted);font-weight:500;}
-  #ratingModal .rm-headline{
+  .results-score span{font-size:22px;color:var(--muted);font-weight:500;}
+  .results-headline{
     font-family:'Fraunces', serif;
     font-weight:700;
-    font-size:20px;
+    font-size:22px;
     color:var(--red);
-    margin:10px 0 14px;
+    text-align:center;
+    margin:8px 0 16px;
     line-height:1.3;
   }
-  #ratingModal .rm-body{
-    font-size:14.5px;
-    line-height:1.6;
+  .results-body{
+    font-size:15px;
+    line-height:1.65;
     color:var(--ink);
-    margin:0 0 18px;
+    text-align:center;
+    max-width:620px;
+    margin:0 auto 26px;
   }
-  #ratingModal .rm-note{
+  .avg-msg{
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:16px;
+    color:var(--green);
+    text-align:center;
+    background:rgba(26,127,55,0.08);
+    border:1px solid rgba(26,127,55,0.25);
+    border-radius:10px;
+    padding:16px 20px;
+    max-width:620px;
+    margin:0 auto 30px;
+    line-height:1.5;
+  }
+  .teer-breakdown{
+    max-width:620px;
+    margin:0 auto 30px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:22px 24px;
+  }
+  .teer-breakdown h3{
+    font-family:'Fraunces', serif;
+    font-size:16px;
+    margin:0 0 14px;
+  }
+  .teer-breakdown table{width:100%;border-collapse:collapse;}
+  .teer-breakdown th,.teer-breakdown td{
+    padding:9px 6px;
+    text-align:left;
+    font-size:13.5px;
+    border-bottom:1px solid var(--line);
+  }
+  .teer-breakdown th{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--muted);
+    font-weight:500;
+  }
+  .teer-breakdown tr:last-child td{border-bottom:none;}
+  .teer-breakdown tr.is-you td{background:rgba(200,16,46,0.06);font-weight:700;}
+  .results-note{
     font-family:'IBM Plex Mono', monospace;
     font-size:11.5px;
     color:var(--muted);
     line-height:1.6;
     background:var(--paper);
+    border:1px solid var(--line);
     border-radius:10px;
     padding:14px 16px;
-    text-align:left;
-    margin:0 0 20px;
+    max-width:620px;
+    margin:0 auto 30px;
   }
-  #ratingModal button{
-    padding:12px 30px;
-    background:var(--navy);color:#fff;border:none;border-radius:8px;
-    font-family:'Inter',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer;
+  .results-actions{
+    display:flex;
+    gap:14px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:20px;
   }
-  #ratingModal button:hover{background:var(--navy-deep);}
+  .results-actions button{
+    padding:13px 28px;
+    border:none;border-radius:10px;
+    font-family:'Inter',sans-serif;font-size:14.5px;font-weight:600;
+    cursor:pointer;transition:background 0.15s, transform 0.1s;
+  }
+  .results-actions button:active{transform:scale(0.98);}
+  #calcAgainBtn{background:var(--navy);color:#fff;}
+  #calcAgainBtn:hover{background:var(--navy-deep);}
+  #exitBtn{background:#fff;color:var(--navy);border:1.5px solid var(--line) !important;}
+  #exitBtn:hover{background:var(--paper);}
+
+  /* ---------- Exit fallback screen ---------- */
+  #exitScreen{
+    display:none;
+    position:fixed;inset:0;
+    background:var(--navy-deep);
+    color:var(--paper);
+    align-items:center;justify-content:center;
+    text-align:center;
+    z-index:9999;
+    font-family:'Inter',sans-serif;
+    padding:20px;
+  }
+  #exitScreen h2{font-family:'Fraunces', serif;font-size:24px;margin:0 0 10px;}
+  #exitScreen p{color:rgba(246,243,236,0.7);font-size:14px;}
 
   /* ---------- Visitor gate styles ---------- */
   #gateOverlay{
@@ -389,14 +455,45 @@
 </div>
 </div>
 
-<!-- ============ RATING MODAL ============ -->
-<div id="ratingOverlay">
-  <div id="ratingModal">
-    <div class="rm-score" id="rmScore">0<span>/130</span></div>
-    <div class="rm-headline" id="rmHeadline"></div>
-    <p class="rm-body" id="rmBody"></p>
-    <div class="rm-note">Good score — but no guarantees. The OINP Workforce Priority Stream hasn't started issuing invitations yet, so no one knows what score will actually get invited. Treat this as planning info, not a promise.</div>
-    <button type="button" onclick="document.getElementById('ratingOverlay').style.display='none'">Got it</button>
+<!-- ============ RESULTS PAGE (shown after scoring) ============ -->
+<div id="resultsPage">
+  <div class="wrap">
+    <header>
+      <div>
+        <p class="eyebrow">Ontario Workforce Priority Stream</p>
+        <h1>Your Results</h1>
+      </div>
+      <div class="max-badge">2026 scoring factors<b>130 pts max</b></div>
+    </header>
+
+    <div class="results-score" id="resScore">0<span>/130</span></div>
+    <div class="results-headline" id="resHeadline"></div>
+    <p class="results-body" id="resBody"></p>
+
+    <p class="avg-msg" id="avgMsg"></p>
+
+    <div class="teer-breakdown">
+      <h3>Average score so far, by NOC TEER category</h3>
+      <table>
+        <thead><tr><th>TEER Category</th><th>Avg. Score</th><th>Responses</th></tr></thead>
+        <tbody id="teerBreakdownRows"></tbody>
+      </table>
+    </div>
+
+    <div class="results-note">Good score — but no guarantees. The OINP Workforce Priority Stream hasn't started issuing invitations yet, so no one knows what score will actually get invited. Treat this as planning info, not a promise.</div>
+
+    <div class="results-actions">
+      <button id="calcAgainBtn" type="button">Calculate Again</button>
+      <button id="exitBtn" type="button">Exit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ EXIT FALLBACK SCREEN ============ -->
+<div id="exitScreen">
+  <div>
+    <h2>Thanks for stopping by</h2>
+    <p>You may now close this tab.</p>
   </div>
 </div>
 
@@ -553,6 +650,10 @@ const factors = [
   },
 ];
 
+// Fixed display order for the TEER breakdown table — must match
+// factors[0].options labels exactly.
+const TEER_ORDER = ["TEER 0 or 1", "TEER 2 or 3", "TEER 4 or 5"];
+
 const grid = document.getElementById('grid');
 const totalNum = document.getElementById('totalNum');
 const barFill = document.getElementById('barFill');
@@ -575,6 +676,7 @@ factors.forEach((f, i) => {
 
   const select = document.createElement('select');
   select.dataset.max = f.max;
+  if (i === 0) select.id = 'teerSelect'; // NOC TEER Category — used for averages
   const placeholder = document.createElement('option');
   placeholder.textContent = 'Select…';
   placeholder.value = '';
@@ -603,6 +705,12 @@ factors.forEach((f, i) => {
   grid.appendChild(card);
 });
 
+function getSelectedTeerLabel() {
+  const s = document.getElementById('teerSelect');
+  if (!s || s.value === '') return null;
+  return s.options[s.selectedIndex].textContent;
+}
+
 function updateTotal(){
   const selects = grid.querySelectorAll('select');
   let total = 0;
@@ -621,12 +729,41 @@ function saveScore(total){
   _scoreSaveTimer = setTimeout(async () => {
     try {
       await window._supabase.from('visitors')
-        .update({ score: total, max_score: MAX_TOTAL })
+        .update({ score: total, max_score: MAX_TOTAL, teer_category: getSelectedTeerLabel() })
         .eq('id', window._visitorId);
     } catch (err) {
       console.error('Score save failed:', err);
     }
   }, 500);
+}
+
+// ---------- Fetch average score per TEER category from all past responses ----------
+async function fetchTeerAverages(){
+  if (!window._supabase) return null;
+  try {
+    const { data, error } = await window._supabase
+      .from('visitors')
+      .select('teer_category, score')
+      .not('score', 'is', null)
+      .not('teer_category', 'is', null);
+    if (error || !data) return null;
+
+    const groups = {};
+    data.forEach(r => {
+      if (!groups[r.teer_category]) groups[r.teer_category] = { sum: 0, count: 0 };
+      groups[r.teer_category].sum += r.score;
+      groups[r.teer_category].count += 1;
+    });
+
+    const result = {};
+    Object.keys(groups).forEach(k => {
+      result[k] = { avg: Math.round(groups[k].sum / groups[k].count), count: groups[k].count };
+    });
+    return result;
+  } catch (err) {
+    console.error('Failed to fetch TEER averages:', err);
+    return null;
+  }
 }
 
 // ---------- Rating messages ----------
@@ -643,18 +780,66 @@ const RATING_TIERS = [
   { min: 0, headline: () => "Room to build.", body: (n,s,m) => `Everyone starts somewhere, ${n}. ${s}/${m} today doesn't reflect where you could be in six months — language gains and more Ontario experience move this number a lot.` },
 ];
 
-function showRating(firstName, total, max){
+function pickTier(total, max){
   const pct = total / max;
   const pool = RATING_TIERS.filter(t => pct >= t.min);
   const floor = pool.length ? Math.max(...pool.map(t => t.min)) : 0;
   const tierOptions = RATING_TIERS.filter(t => t.min === floor);
-  const chosen = tierOptions[Math.floor(Math.random() * tierOptions.length)];
+  return tierOptions[Math.floor(Math.random() * tierOptions.length)];
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function showResultsPage(firstName, total, max, userTeerLabel){
+  const chosen = pickTier(total, max);
   const name = firstName || 'there';
 
-  document.getElementById('rmScore').innerHTML = `${total}<span>/${max}</span>`;
-  document.getElementById('rmHeadline').textContent = chosen.headline();
-  document.getElementById('rmBody').textContent = chosen.body(name, total, max);
-  document.getElementById('ratingOverlay').style.display = 'flex';
+  document.getElementById('resScore').innerHTML = `${total}<span>/${max}</span>`;
+  document.getElementById('resHeadline').textContent = chosen.headline();
+  document.getElementById('resBody').textContent = chosen.body(name, total, max);
+
+  const averages = await fetchTeerAverages();
+
+  // Green bold message for the visitor's own NOC category
+  const avgMsgEl = document.getElementById('avgMsg');
+  if (userTeerLabel && averages && averages[userTeerLabel]) {
+    const a = averages[userTeerLabel];
+    avgMsgEl.textContent = `The average score for your NOC category (${userTeerLabel}) is ${a.avg}/${max} so far, based on ${a.count} response${a.count === 1 ? '' : 's'}.`;
+  } else if (userTeerLabel) {
+    avgMsgEl.textContent = `You're the first person in the ${userTeerLabel} category to calculate a score — check back later to see how you compare!`;
+  } else {
+    avgMsgEl.textContent = `Average score data isn't available right now.`;
+  }
+
+  // Full breakdown table across all TEER categories
+  const rowsHtml = TEER_ORDER.map(cat => {
+    const a = averages && averages[cat];
+    const isYou = cat === userTeerLabel;
+    return `<tr class="${isYou ? 'is-you' : ''}">
+              <td>${escapeHtml(cat)}${isYou ? ' (you)' : ''}</td>
+              <td>${a ? a.avg + ' / ' + max : '—'}</td>
+              <td>${a ? a.count : 0}</td>
+            </tr>`;
+  }).join('');
+  document.getElementById('teerBreakdownRows').innerHTML = rowsHtml;
+
+  document.getElementById('calculatorContent').style.display = 'none';
+  document.getElementById('resultsPage').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
+function resetCalculator(){
+  grid.querySelectorAll('select').forEach(s => {
+    s.selectedIndex = 0;
+    const out = s.parentElement.querySelector('.pts-out .val');
+    if (out) out.textContent = '0';
+  });
+  updateTotal();
+  document.getElementById('resultsPage').style.display = 'none';
+  document.getElementById('calculatorContent').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 document.getElementById('rateBtn').addEventListener('click', async () => {
@@ -670,18 +855,30 @@ document.getElementById('rateBtn').addEventListener('click', async () => {
 
   let total = 0;
   selects.forEach(s => { total += parseInt(s.value, 10); });
+  const userTeerLabel = getSelectedTeerLabel();
 
   if (window._supabase && window._visitorId) {
     try {
       await window._supabase.from('visitors')
-        .update({ score: total, max_score: MAX_TOTAL })
+        .update({ score: total, max_score: MAX_TOTAL, teer_category: userTeerLabel })
         .eq('id', window._visitorId);
     } catch (err) {
       console.error('Score save failed:', err);
     }
   }
 
-  showRating(window._firstName, total, MAX_TOTAL);
+  await showResultsPage(window._firstName, total, MAX_TOTAL, userTeerLabel);
+});
+
+document.getElementById('calcAgainBtn').addEventListener('click', resetCalculator);
+
+document.getElementById('exitBtn').addEventListener('click', () => {
+  // window.close() only works for tabs opened by script; most browsers
+  // silently ignore it on a normally-navigated tab. The fallback screen
+  // below covers that case.
+  window.close();
+  document.getElementById('resultsPage').style.display = 'none';
+  document.getElementById('exitScreen').style.display = 'flex';
 });
 </script>
 </body>
