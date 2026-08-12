@@ -21,6 +21,10 @@
 
   let allRows = [];
 
+  // Fixed display order for the TEER breakdown — must match the
+  // option labels used in the calculator's NOC TEER Category factor.
+  const TEER_ORDER = ['TEER 0 or 1', 'TEER 2 or 3', 'TEER 4 or 5'];
+
   window.checkPw = function () {
     const entered = document.getElementById('pw').value;
     const pwErr = document.getElementById('pwErr');
@@ -44,7 +48,7 @@
     document.getElementById('loading').style.display = 'block';
     const { data, error } = await supabase
       .from('visitors')
-      .select('first_name, email, score, max_score, created_at')
+      .select('first_name, email, score, max_score, created_at, teer_category')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -58,6 +62,7 @@
     renderTable();
     renderRanking();
     renderEmails();
+    renderNocAverages();
   }
 
   // Collapse repeat submissions from the same person down to their latest
@@ -170,6 +175,27 @@
       const scoreTxt = (r.score !== null && r.score !== undefined) ? r.score + ' / ' + (r.max_score || 130) : '—';
       return `<tr><td>${escapeHtml(r.first_name || 'Unknown')}</td><td>${escapeHtml(r.email)}</td><td>${scoreTxt}</td><td>${dt}</td></tr>`;
     }).join('') || '<tr><td colspan="4" style="color:var(--muted);">No emails collected yet.</td></tr>';
+  }
+
+  // Average score per NOC TEER category, using each person's latest
+  // scored submission (same dedupe logic as the Ranking tab).
+  function renderNocAverages() {
+    const scoredLatest = dedupeLatest(allRows.filter(r => r.score !== null && r.score !== undefined && r.teer_category));
+    const groups = {};
+    scoredLatest.forEach(r => {
+      if (!groups[r.teer_category]) groups[r.teer_category] = { sum: 0, count: 0 };
+      groups[r.teer_category].sum += r.score;
+      groups[r.teer_category].count += 1;
+    });
+
+    const maxScore = scoredLatest.length ? (scoredLatest[0].max_score || 130) : 130;
+
+    document.getElementById('nocCount').textContent = scoredLatest.length + ' scored response(s) with a NOC category on file';
+    document.getElementById('nocRows').innerHTML = TEER_ORDER.map(cat => {
+      const g = groups[cat];
+      const avg = g ? Math.round(g.sum / g.count) : null;
+      return `<tr><td>${escapeHtml(cat)}</td><td>${avg !== null ? avg + ' / ' + maxScore : '—'}</td><td>${g ? g.count : 0}</td></tr>`;
+    }).join('');
   }
 
   window.exportEmailsCsv = function () {
@@ -367,7 +393,7 @@
   .filters input:focus{outline:none;border-color:var(--red);}
 
   .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
-  #count{font-family:'IBM Plex Mono', monospace;font-size:12px;color:var(--muted);}
+  #count,#rankCount,#emailCount,#nocCount{font-family:'IBM Plex Mono', monospace;font-size:12px;color:var(--muted);}
   #exportBtn, #refreshBtn{
     padding:9px 16px;
     background:var(--navy);color:var(--paper);border:none;
@@ -413,6 +439,7 @@
     <div class="nav-item" id="nav-visitors" onclick="showTab('visitors')">Visitor Log</div>
     <div class="nav-item" id="nav-ranking" onclick="showTab('ranking')">Ranking</div>
     <div class="nav-item" id="nav-emails" onclick="showTab('emails')">Email List</div>
+    <div class="nav-item" id="nav-noc" onclick="showTab('noc')">NOC Averages</div>
   </nav>
 
   <main>
@@ -485,6 +512,18 @@
       <table>
         <thead><tr><th>First Name</th><th>Email</th><th>Score</th><th>Date / Time</th></tr></thead>
         <tbody id="emailRows"></tbody>
+      </table>
+    </div>
+
+    <!-- ===== NOC AVERAGES TAB ===== -->
+    <div class="tab-panel" id="tab-noc" style="display:none;">
+      <h1>Average Score by NOC TEER Category</h1>
+      <div class="toolbar">
+        <div id="nocCount"></div>
+      </div>
+      <table>
+        <thead><tr><th>TEER Category</th><th>Avg. Score</th><th>Responses</th></tr></thead>
+        <tbody id="nocRows"></tbody>
       </table>
     </div>
   </main>
